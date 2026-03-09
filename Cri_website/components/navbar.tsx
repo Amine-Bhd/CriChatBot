@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
-import { Menu, X } from "lucide-react"
+import { Menu, X, LayoutDashboard } from "lucide-react"
 import { CriLogo } from "./cri-logo"
 import { cn } from "@/lib/utils"
 
@@ -48,8 +48,22 @@ export function Navbar() {
           })}
         </nav>
 
-        {/* Auth buttons */}
+        {/* Desktop right side */}
         <div className="hidden lg:flex items-center gap-3">
+          {/* Admin button */}
+          <Link
+            href="/admin"
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+              pathname === "/admin"
+                ? "bg-primary text-primary-foreground"
+                : "border border-primary text-primary hover:bg-secondary"
+            )}
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Console Admin
+          </Link>
+
           <Link
             href="#"
             className="rounded-full border border-primary px-5 py-2 text-sm font-medium text-primary hover:bg-secondary transition-colors"
@@ -96,6 +110,22 @@ export function Navbar() {
                 </Link>
               )
             })}
+
+            {/* Admin link in mobile menu */}
+            <Link
+              href="/admin"
+              onClick={() => setMobileOpen(false)}
+              className={cn(
+                "flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-md transition-colors",
+                pathname === "/admin"
+                  ? "text-primary bg-secondary"
+                  : "text-muted-foreground hover:text-primary hover:bg-secondary"
+              )}
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              Console Admin
+            </Link>
+
             <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-border">
               <Link
                 href="#"
