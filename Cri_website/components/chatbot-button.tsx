@@ -8,11 +8,26 @@ interface Message {
   content: string
 }
 
+// ── Session management ────────────────────────────────────────────────────────
+// Generates a sessionId once per tab and stores it in sessionStorage.
+// Survives page refresh and navigation within the tab.
+// Cleared automatically when the tab is closed.
+function getOrCreateSessionId(): string {
+  if (typeof window === "undefined") return ""
+  const KEY = "cri_chat_session"
+  const existing = sessionStorage.getItem(KEY)
+  if (existing) return existing
+  const newId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+  sessionStorage.setItem(KEY, newId)
+  return newId
+}
+
 export function ChatbotButton() {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen]     = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState("")
+  const [input, setInput]       = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [sessionId] = useState<string>(() => getOrCreateSessionId())
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -32,7 +47,10 @@ export function ChatbotButton() {
       const res = await fetch("/api/chatbot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed }),
+        body: JSON.stringify({
+          message:   trimmed,
+          sessionId,          // ← sent with every message, stable for the whole tab session
+        }),
       })
 
       if (!res.ok) throw new Error("Erreur serveur")
@@ -40,12 +58,12 @@ export function ChatbotButton() {
       const data = await res.json()
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: data.reply || "Pas de reponse." },
+        { role: "assistant", content: data.reply || "Pas de réponse." },
       ])
     } catch {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Desolee, une erreur est survenue. Veuillez reessayer." },
+        { role: "assistant", content: "Désolée, une erreur est survenue. Veuillez réessayer." },
       ])
     } finally {
       setIsLoading(false)
@@ -92,7 +110,7 @@ export function ChatbotButton() {
                   Bienvenue sur le chat CRI
                 </p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  {"Posez vos questions sur les procedures d'investissement, le foncier, ou les incitations."}
+                  {"Posez vos questions sur les procédures d'investissement, le foncier, ou les incitations."}
                 </p>
               </div>
             ) : (
@@ -102,7 +120,7 @@ export function ChatbotButton() {
                   className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
                       msg.role === "user"
                         ? "bg-primary text-primary-foreground rounded-br-md"
                         : "bg-muted text-foreground rounded-bl-md"

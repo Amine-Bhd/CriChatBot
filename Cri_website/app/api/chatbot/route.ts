@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       // n8n AI Agent reads $json.body — keep this key consistent
-      body:    JSON.stringify({ body: question }),
+      body:    JSON.stringify({ body: question, message: question, sessionId }),
     })
 
     if (!res.ok) {
