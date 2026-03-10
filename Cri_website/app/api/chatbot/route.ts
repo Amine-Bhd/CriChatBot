@@ -8,12 +8,14 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 // ── Low-confidence detection patterns ────────────────────────────────────────
 // If the AI reply contains any of these, the row is tagged is_low_confidence=true
 const LOW_CONFIDENCE_PATTERNS = [
+  "je ne dispose pas de cette information",
   "je ne trouve pas",
   "je ne peux pas trouver",
   "cette information n'est pas",
   "n'est pas présente dans",
   "veuillez consulter un représentant",
   "je n'ai pas cette information",
+  "contactez directement un conseiller",
   "cannot find",
   "not available",
   "i cannot find",
