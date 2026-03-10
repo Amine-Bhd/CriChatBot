@@ -1,8 +1,5 @@
 'use client'
 // app/admin/page.tsx
-// ─────────────────────────────────────────────────────────────────────────────
-// Tableau de bord admin — Journalisation des conversations CRI-RSK
-// ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback } from 'react'
 
@@ -27,14 +24,12 @@ interface Pagination {
   totalPages: number
 }
 
-// ── Constants ────────────────────────────────────────────────────────────────
 const LIMIT = 15
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat('fr-MA', {
-    day:    '2-digit', month: '2-digit', year: 'numeric',
-    hour:   '2-digit', minute: '2-digit'
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
   }).format(new Date(iso))
 }
 
@@ -44,48 +39,60 @@ function truncate(str: string, n: number) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function AdminPage() {
-  const [conversations, setConversations]   = useState<Conversation[]>([])
-  const [pagination,    setPagination]      = useState<Pagination | null>(null)
-  const [loading,       setLoading]         = useState(true)
-  const [error,         setError]           = useState('')
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [pagination, setPagination]       = useState<Pagination | null>(null)
+  const [loading, setLoading]             = useState(true)
+  const [error, setError]                 = useState('')
 
   // Filters
-  const [search,    setSearch]    = useState('')
+  const [search, setSearch]               = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [page,      setPage]      = useState(1)
-  const [flagFilter, setFlagFilter] = useState<'all' | 'flagged' | 'low'>('all')
-  const [dateFrom,  setDateFrom]  = useState('')
-  const [dateTo,    setDateTo]    = useState('')
+  const [page, setPage]                   = useState(1)
+  const [flagFilter, setFlagFilter]       = useState<'all' | 'flagged' | 'low'>('all')
+  const [dateFrom, setDateFrom]           = useState('')
+  const [dateTo, setDateTo]               = useState('')
+  const [sessionFilter, setSessionFilter] = useState('')
+  const [debouncedSession, setDebouncedSession] = useState('')
 
   // Modal
-  const [selected,  setSelected]  = useState<Conversation | null>(null)
-  const [flagNote,  setFlagNote]   = useState('')
-  const [saving,    setSaving]     = useState(false)
+  const [selected, setSelected]           = useState<Conversation | null>(null)
+  const [flagNote, setFlagNote]           = useState('')
+  const [saving, setSaving]               = useState(false)
 
   // Stats
   const [stats, setStats] = useState({ total: 0, flagged: 0, lowConf: 0 })
 
-  // ── Debounce search ─────────────────────────────────────────────────────────
+  // ── Debounce search ──────────────────────────────────────────────────────────
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400)
     return () => clearTimeout(t)
   }, [search])
 
-  useEffect(() => { setPage(1) }, [debouncedSearch, flagFilter, dateFrom, dateTo])
+  // ── Debounce session filter ──────────────────────────────────────────────────
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSession(sessionFilter), 400)
+    return () => clearTimeout(t)
+  }, [sessionFilter])
 
-  // ── Fetch conversations ─────────────────────────────────────────────────────
+  // ── Reset page on filter change ──────────────────────────────────────────────
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, flagFilter, dateFrom, dateTo, debouncedSession])
+
+  // ── Fetch conversations ──────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
       const params = new URLSearchParams({
-        page:    String(page),
-        limit:   String(LIMIT),
-        search:  debouncedSearch,
+        page:   String(page),
+        limit:  String(LIMIT),
+        search: debouncedSearch,
         ...(flagFilter === 'flagged' ? { flagged: 'true' }        : {}),
         ...(flagFilter === 'low'     ? { low_confidence: 'true' } : {}),
-        ...(dateFrom ? { date_from: dateFrom } : {}),
-        ...(dateTo   ? { date_to:   dateTo   } : {}),
+        ...(dateFrom         ? { date_from:  dateFrom         } : {}),
+        ...(dateTo           ? { date_to:    dateTo           } : {}),
+        ...(debouncedSession ? { session_id: debouncedSession } : {}),
       })
       const res  = await fetch(`/api/admin/conversations?${params}`)
       const json = await res.json()
@@ -97,11 +104,11 @@ export default function AdminPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, debouncedSearch, flagFilter, dateFrom, dateTo])
+  }, [page, debouncedSearch, flagFilter, dateFrom, dateTo, debouncedSession])
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // ── Fetch stats ─────────────────────────────────────────────────────────────
+  // ── Fetch stats ──────────────────────────────────────────────────────────────
   useEffect(() => {
     async function fetchStats() {
       try {
@@ -118,9 +125,9 @@ export default function AdminPage() {
       } catch {}
     }
     fetchStats()
-  }, [conversations]) // refresh after any change
+  }, [conversations])
 
-  // ── Flag / unflag ───────────────────────────────────────────────────────────
+  // ── Flag / unflag ────────────────────────────────────────────────────────────
   async function toggleFlag(conv: Conversation) {
     setSaving(true)
     try {
@@ -143,24 +150,25 @@ export default function AdminPage() {
     }
   }
 
-  // ── Export CSV ──────────────────────────────────────────────────────────────
+  // ── Export CSV ───────────────────────────────────────────────────────────────
   function exportCSV() {
     const params = new URLSearchParams({
       format: 'csv',
       search: debouncedSearch,
       ...(flagFilter === 'flagged' ? { flagged: 'true' }        : {}),
       ...(flagFilter === 'low'     ? { low_confidence: 'true' } : {}),
-      ...(dateFrom ? { date_from: dateFrom } : {}),
-      ...(dateTo   ? { date_to:   dateTo   } : {}),
+      ...(dateFrom         ? { date_from:  dateFrom         } : {}),
+      ...(dateTo           ? { date_to:    dateTo           } : {}),
+      ...(debouncedSession ? { session_id: debouncedSession } : {}),
     })
     window.open(`/api/admin/conversations?${params}`, '_blank')
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      {/* Header */}
       <header className="bg-[#1B3A6B] text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -185,18 +193,18 @@ export default function AdminPage() {
 
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-6">
 
-        {/* ── Stats cards ────────────────────────────────────────────────────── */}
+        {/* Stats cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard label="Total conversations" value={stats.total} icon="💬" color="blue" />
+          <StatCard label="Total conversations" value={stats.total}   icon="💬" color="blue"   />
           <StatCard label="Marquées pour révision" value={stats.flagged} icon="🚩" color="orange" />
-          <StatCard label="Faible confiance" value={stats.lowConf} icon="⚠️" color="yellow" />
+          <StatCard label="Faible confiance"     value={stats.lowConf} icon="⚠️" color="yellow" />
         </div>
 
-        {/* ── Filters ────────────────────────────────────────────────────────── */}
+        {/* Filters */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
 
-            {/* Search */}
+            {/* Full-text search */}
             <div className="relative lg:col-span-2">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -210,7 +218,7 @@ export default function AdminPage() {
               />
             </div>
 
-            {/* Flag filter */}
+            {/* Status filter */}
             <select
               value={flagFilter}
               onChange={e => setFlagFilter(e.target.value as 'all' | 'flagged' | 'low')}
@@ -221,7 +229,7 @@ export default function AdminPage() {
               <option value="low">⚠️ Faible confiance</option>
             </select>
 
-            {/* Export */}
+            {/* Export button */}
             <button
               onClick={exportCSV}
               className="flex items-center justify-center gap-2 py-2 px-4 text-sm font-medium bg-[#1B3A6B] text-white rounded-lg hover:bg-[#2E6DB4] transition-colors"
@@ -233,20 +241,52 @@ export default function AdminPage() {
             </button>
 
             {/* Date range */}
-            <div className="flex gap-2 md:col-span-2 lg:col-span-2">
+            <div className="flex gap-2 md:col-span-2">
               <div className="flex-1 relative">
                 <label className="absolute -top-2 left-2 text-[10px] text-slate-400 bg-white px-1">Du</label>
-                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                  className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50" />
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={e => setDateFrom(e.target.value)}
+                  className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
+                />
               </div>
               <div className="flex-1 relative">
                 <label className="absolute -top-2 left-2 text-[10px] text-slate-400 bg-white px-1">Au</label>
-                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                  className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50" />
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={e => setDateTo(e.target.value)}
+                  className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
+                />
               </div>
               {(dateFrom || dateTo) && (
-                <button onClick={() => { setDateFrom(''); setDateTo('') }}
-                  className="px-3 py-2 text-xs text-slate-500 hover:text-red-500 border border-slate-200 rounded-lg transition-colors">
+                <button
+                  onClick={() => { setDateFrom(''); setDateTo('') }}
+                  className="px-3 py-2 text-xs text-slate-500 hover:text-red-500 border border-slate-200 rounded-lg transition-colors"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Session ID filter */}
+            <div className="relative md:col-span-2">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Filtrer par Session ID  (ex: session_1234567890_abc123)"
+                value={sessionFilter}
+                onChange={e => setSessionFilter(e.target.value)}
+                className="w-full pl-9 pr-10 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 font-mono"
+              />
+              {sessionFilter && (
+                <button
+                  onClick={() => { setSessionFilter(''); setDebouncedSession('') }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors text-xs"
+                >
                   ✕
                 </button>
               )}
@@ -255,20 +295,21 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* ── Table ──────────────────────────────────────────────────────────── */}
+        {/* Table */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
 
           {/* Table header info */}
           <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
             <span className="text-sm text-slate-500">
               {pagination ? `${pagination.total} résultat${pagination.total > 1 ? 's' : ''}` : '…'}
-              {debouncedSearch && ` pour "${debouncedSearch}"`}
+              {debouncedSearch   && ` pour "${debouncedSearch}"`}
+              {debouncedSession  && ` · session: ${debouncedSession.slice(0, 24)}…`}
             </span>
             {loading && (
               <span className="text-xs text-blue-500 flex items-center gap-1">
                 <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                 </svg>
                 Chargement…
               </span>
@@ -299,7 +340,9 @@ export default function AdminPage() {
                   {conversations.map(conv => (
                     <tr
                       key={conv.id}
-                      className={`hover:bg-slate-50 transition-colors cursor-pointer ${conv.is_flagged ? 'bg-orange-50/40' : conv.is_low_confidence ? 'bg-yellow-50/40' : ''}`}
+                      className={`hover:bg-slate-50 transition-colors cursor-pointer ${
+                        conv.is_flagged ? 'bg-orange-50/40' : conv.is_low_confidence ? 'bg-yellow-50/40' : ''
+                      }`}
                       onClick={() => { setSelected(conv); setFlagNote(conv.flag_reason || '') }}
                     >
                       <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
@@ -358,22 +401,29 @@ export default function AdminPage() {
             </div>
           )}
         </div>
+
       </main>
 
-      {/* ── Detail Modal ────────────────────────────────────────────────────── */}
+      {/* Detail Modal */}
       {selected && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setSelected(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto"
-            onClick={e => e.stopPropagation()}>
-
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
             {/* Modal header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
               <div className="flex items-center gap-2">
                 <StatusBadge conv={selected} />
                 <span className="text-sm text-slate-400">{formatDate(selected.timestamp)}</span>
               </div>
-              <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-600 transition-colors">
+              <button
+                onClick={() => setSelected(null)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -383,26 +433,32 @@ export default function AdminPage() {
             {/* Modal body */}
             <div className="px-6 py-5 space-y-4">
 
-              {/* Question */}
               <div>
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Question</label>
-                <p className="mt-1 text-slate-800 text-sm leading-relaxed bg-slate-50 rounded-lg p-3">{selected.question}</p>
+                <p className="mt-1 text-slate-800 text-sm leading-relaxed bg-slate-50 rounded-lg p-3">
+                  {selected.question}
+                </p>
               </div>
 
-              {/* Answer */}
               <div>
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Réponse</label>
-                <p className="mt-1 text-slate-700 text-sm leading-relaxed bg-blue-50/50 rounded-lg p-3 whitespace-pre-wrap">{selected.answer}</p>
+                <p className="mt-1 text-slate-700 text-sm leading-relaxed bg-blue-50/50 rounded-lg p-3 whitespace-pre-wrap">
+                  {selected.answer}
+                </p>
               </div>
 
-              {/* Sources */}
               {selected.source_urls && selected.source_urls.length > 0 && (
                 <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Sources citées</label>
                   <div className="mt-1 space-y-1">
                     {selected.source_urls.map((url, i) => (
-                      <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                        className="block text-xs text-blue-600 hover:text-blue-800 truncate underline-offset-2 hover:underline">
+                      <a
+                        key={i}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-xs text-blue-600 hover:text-blue-800 truncate underline-offset-2 hover:underline"
+                      >
                         {url}
                       </a>
                     ))}
@@ -410,7 +466,6 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* Flag note */}
               <div>
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
                   Note de révision (optionnelle)
@@ -428,12 +483,14 @@ export default function AdminPage() {
 
             {/* Modal footer */}
             <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-xs text-slate-400">
-                Session: {selected.session_id || '—'}
-              </span>
+              <div className="text-xs text-slate-400 space-y-0.5">
+                <div>Session: <span className="font-mono">{selected.session_id || '—'}</span></div>
+              </div>
               <div className="flex gap-3">
-                <button onClick={() => setSelected(null)}
-                  className="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors">
+                <button
+                  onClick={() => setSelected(null)}
+                  className="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
+                >
                   Fermer
                 </button>
                 <button
@@ -452,6 +509,7 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
     </div>
   )
 }
