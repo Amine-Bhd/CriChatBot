@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
   if (flagged === 'false')query = query.eq('is_flagged', false)
   if (lowConf === 'true') query = query.eq('is_low_confidence', true)
   if (dateFrom)           query = query.gte('timestamp', dateFrom)
-  if (dateTo)             query = query.lte('timestamp', dateTo)
+  if (dateTo)             query = query.lte('timestamp', `${dateTo}T23:59:59`)
   if (sessionId)          query = query.eq('session_id', sessionId)   // exact match
 
   // CSV export — no pagination, return all matching rows
