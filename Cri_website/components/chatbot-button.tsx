@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from "react"
 import { MessageCircle, X } from "lucide-react"
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface Message {
   role: "user" | "assistant"
@@ -23,9 +25,9 @@ function getOrCreateSessionId(): string {
 }
 
 export function ChatbotButton() {
-  const [isOpen, setIsOpen]     = useState(false)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput]       = useState("")
+  const [isOpen, setIsOpen]       = useState(false)
+  const [messages, setMessages]   = useState<Message[]>([])
+  const [input, setInput]         = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [sessionId] = useState<string>(() => getOrCreateSessionId())
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -48,8 +50,8 @@ export function ChatbotButton() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message:   trimmed,
-          sessionId,          // ← sent with every message, stable for the whole tab session
+          message: trimmed,
+          sessionId, // ← sent with every message, stable for the whole tab session
         }),
       })
 
@@ -120,17 +122,45 @@ export function ChatbotButton() {
                   className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                       msg.role === "user"
                         ? "bg-primary text-primary-foreground rounded-br-md"
                         : "bg-muted text-foreground rounded-bl-md"
                     }`}
                   >
-                    {msg.content}
+                    {msg.role === "assistant" ? (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+                          ul: ({ children }) => <ul className="list-disc pl-4 mt-1 mb-1 space-y-0">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal pl-4 mt-1 mb-1 space-y-0">{children}</ol>,
+                          li: ({ children }) => <li className="leading-snug">{children}</li>,
+                          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                          h2: ({ children }) => <p className="font-bold mt-2 mb-1">{children}</p>,
+                          h3: ({ children }) => <p className="font-semibold mt-1 mb-0.5">{children}</p>,
+                          a: ({ href, children }) => (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary underline underline-offset-2 break-all"
+                            >
+                              {children}
+                            </a>
+                          ),
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    ) : (
+                      msg.content
+                    )}
                   </div>
                 </div>
               ))
             )}
+
             {isLoading && (
               <div className="flex justify-start">
                 <div className="flex gap-1.5 rounded-2xl rounded-bl-md bg-muted px-4 py-3">
